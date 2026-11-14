@@ -59,7 +59,7 @@ Rules
  6. Never run: docker swarm leave / docker node rm / docker system prune -a   (they affect everybody).
  7. The registry on localhost:5000 is reachable from this server only.
 EOD
-if [[ ! -f "$STACKS_DIR/demo.yml" ]]; then
+
 cat > "$STACKS_DIR/demo.yml" <<EOD
 version: "3.8"
 services:
@@ -84,10 +84,11 @@ networks:
   $SWARM_NET:
     external: true
 EOD
-fi
 chown -R root:"$DEV_GROUP" "$STACKS_DIR"; chmod 2775 "$STACKS_DIR"; find "$STACKS_DIR" -type f -exec chmod 664 {} +
 
 # ---------- 5) demo stack (proves scheduling, load-balancing and the overlay network) ----------
+docker stack rm demo >/dev/null 2>&1 || true
+sleep 2
 if docker stack deploy -c "$STACKS_DIR/demo.yml" demo >/dev/null 2>&1; then
   for _ in $(seq 1 30); do
     [[ "$(docker service ls --filter name=demo_web --format '{{.Replicas}}')" == "2/2" ]] && break; sleep 2

@@ -6,6 +6,7 @@ SSH_PORT="$(ss -tlnp 2>/dev/null | awk '/sshd/ {n=split($4,a,":"); print a[n]; e
 
 if command -v ufw >/dev/null 2>&1; then
   ufw --force reset >/dev/null
+  sed -i 's/DEFAULT_FORWARD_POLICY="DROP"/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw 2>/dev/null || true
   ufw default deny incoming; ufw default allow outgoing
   ufw limit "${SSH_PORT}/tcp" comment 'SSH (rate limited)'     # allow SSH FIRST to avoid lock-out
   ufw allow "${DASH_PORT}/tcp" comment 'Dashboard'
