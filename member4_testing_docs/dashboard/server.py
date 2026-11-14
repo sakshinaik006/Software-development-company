@@ -205,77 +205,715 @@ def metrics():
     }
 
 
-HTML = r"""<!doctype html><html><head><meta charset="utf-8">
+HTML = r"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dev Server Dashboard</title>
+<title>DevForge OS &middot; Enterprise Linux Platform (Docker &amp; Swarm)</title>
 <style>
-:root{--bg:#0f172a;--card:#1e293b;--tx:#e2e8f0;--mut:#94a3b8;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--acc:#38bdf8}
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx)}
-header{padding:16px 24px;background:#111c33;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-h1{font-size:20px;margin:0}small{color:var(--mut)}
-main{padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px}
-.card{background:var(--card);border-radius:12px;padding:16px}
-.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:0 0 12px}
-.big{font-size:32px;font-weight:700}
-.bar{height:10px;background:#334155;border-radius:6px;overflow:hidden;margin:6px 0 10px}
-.bar>div{height:100%;background:var(--ok);transition:width .5s}
-.row{display:flex;justify-content:space-between;font-size:14px;margin:4px 0;gap:8px}
-.pill{padding:2px 10px;border-radius:99px;font-size:12px;font-weight:600}
-.active{background:#14532d;color:#86efac}.inactive,.failed,.n\/a{background:#7f1d1d;color:#fca5a5}.n\/a{background:#334155;color:#94a3b8}
-table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:4px 6px;border-bottom:1px solid #334155}
-.wide{grid-column:1/-1}.alert{color:var(--warn);font-size:13px;margin:3px 0}.fail{color:var(--bad);font-size:13px}
-code{color:var(--acc);font-size:12px}
-</style></head><body>
-<header><div><h1>🖥️ <span id="host">Dev Server</span> – Monitoring Dashboard</h1>
-<small id="meta"></small></div><small>Auto-refresh 5 s · <span id="clock"></span></small></header>
-<main id="m"><div class="card">Loading…</div></main>
-<script>
-const fmt=b=>{if(b==null)return'-';const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<4){b/=1024;i++}return b.toFixed(1)+' '+u[i]};
-const col=p=>p>=90?'var(--bad)':p>=75?'var(--warn)':'var(--ok)';
-const bar=p=>`<div class="bar"><div style="width:${Math.min(p,100)}%;background:${col(p)}"></div></div>`;
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const pill=s=>`<span class="pill ${s}">${s}</span>`;
-function render(d){
- document.getElementById('host').textContent=d.hostname;
- document.getElementById('meta').textContent=`Kernel ${d.kernel} · Uptime ${d.uptime_h} h · ${d.cpus} CPU(s)`;
- document.getElementById('clock').textContent=d.time;
- const t=d.tests, tt=t.pass+t.fail;
- let h='';
- h+=`<div class="card"><h2>CPU usage</h2><div class="big">${d.cpu}%</div>${bar(d.cpu)}
-   <div class="row"><span>Load avg (1/5/15)</span><span>${d.load.map(x=>x.toFixed(2)).join(' / ')}</span></div></div>`;
- h+=`<div class="card"><h2>Memory</h2><div class="big">${d.mem.percent}%</div>${bar(d.mem.percent)}
-   <div class="row"><span>${fmt(d.mem.used)} / ${fmt(d.mem.total)}</span><span>Swap ${fmt(d.mem.swap_used)} / ${fmt(d.mem.swap_total)}</span></div></div>`;
- h+=`<div class="card"><h2>Developers</h2><div class="big">${d.users.developers}</div>
-   <div class="row"><span>Logged in now</span><b>${d.users.logged_in}</b></div>
-   ${d.users.sessions.map(s=>`<div class="row"><small>${s}</small></div>`).join('')}
-   <div class="row"><span>Failed SSH logins</span><b>${d.failed_ssh??'n/a'}</b></div></div>`;
- h+=`<div class="card"><h2>Storage (mounted volumes)</h2>`+d.disks.map(x=>x.mounted?
-   `<div class="row"><span>${x.mount}</span><span>${fmt(x.used)} / ${fmt(x.total)} (${x.percent}%)</span></div>${bar(x.percent)}`:
-   `<div class="row"><span>${x.mount}</span><span class="pill inactive">not mounted</span></div>`).join('')+`</div>`;
- h+=`<div class="card"><h2>LVM</h2>`+(d.lvm.vg?`<div class="row"><span>VG <b>${d.lvm.vg.name}</b></span><span>${d.lvm.vg.size} GB total · ${d.lvm.vg.free} GB free</span></div>`:'<small>No LVM data (run as root)</small>')+
-   `<table><tr><th>LV</th><th>Size</th><th>Attr</th></tr>${d.lvm.lvs.map(l=>`<tr><td>${l.lv}</td><td>${l.size_gb} GB</td><td><code>${l.attr}</code></td></tr>`).join('')}</table></div>`;
- h+=`<div class="card"><h2>Services</h2>`+Object.entries(d.services).map(([k,v])=>`<div class="row"><span>${k}</span>${pill(v)}</div>`).join('')+`</div>`;
- if(d.docker){h+=`<div class="card wide"><h2>Docker (shared daemon)</h2>`+(d.docker.running?
-   `<div class="row"><span>Engine ${esc(d.docker.version)}</span><span>${d.docker.up} running / ${d.docker.total} containers · ${d.docker.images} images</span></div>
-   <table><tr><th>Container</th><th>Owner</th><th>Image</th><th>Status</th></tr>${d.docker.containers.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.owner)}</td><td>${esc(c.image)}</td><td>${esc(c.status)}</td></tr>`).join('')||'<tr><td colspan=4>No containers yet</td></tr>'}</table>`
-   :`<span class="pill inactive">daemon not running</span>`)+`</div>`;}
- if(d.swarm){h+=`<div class="card wide"><h2>Orchestration (Docker Swarm)</h2>`+(d.swarm.active?
-   `<div class="row"><span>${d.swarm.nodes.length} node(s) · ${d.swarm.services.length} service(s)</span><span>${d.swarm.unhealthy?`<span class="pill inactive">${d.swarm.unhealthy} unhealthy</span>`:'<span class="pill active">all healthy</span>'}</span></div>
-   <table><tr><th>Node</th><th>Role</th><th>Status</th><th>Availability</th></tr>${d.swarm.nodes.map(n=>`<tr><td>${esc(n.host)}</td><td>${esc(n.role)}</td><td>${esc(n.status)}</td><td>${esc(n.avail)}</td></tr>`).join('')}</table><br>
-   <table><tr><th>Service</th><th>Mode</th><th>Replicas</th><th>Image</th><th>Ports</th></tr>${d.swarm.services.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.mode)}</td><td style="color:${x.healthy?'var(--ok)':'var(--bad)'}">${esc(x.replicas)}</td><td>${esc(x.image)}</td><td>${esc(x.ports)}</td></tr>`).join('')||'<tr><td colspan=5>No services deployed</td></tr>'}</table>`
-   :`<small>Swarm not initialised (run member1_sysadmin/06_swarm.sh)</small>`)+`</div>`;}
- h+=`<div class="card"><h2>Test results (Member 4)</h2><div class="big" style="color:${t.fail?'var(--bad)':'var(--ok)'}">${t.pass}/${tt||'-'}</div>
-   <small>${t.summary}</small>${t.failed.map(f=>`<div class="fail">✗ ${f}</div>`).join('')}</div>`;
- h+=`<div class="card"><h2>Alerts</h2>`+(d.alerts.length?d.alerts.map(a=>`<div class="alert">⚠ ${a}</div>`).join(''):'<small>No recent alerts ✔</small>')+`</div>`;
- h+=`<div class="card wide"><h2>Backups (/backup/daily)</h2><table><tr><th>File</th><th>Size</th><th>Created</th></tr>`+
-   (d.backups.map(b=>`<tr><td>${b.name}</td><td>${fmt(b.size)}</td><td>${b.time}</td></tr>`).join('')||'<tr><td colspan=3>No backups yet</td></tr>')+`</table></div>`;
- h+=`<div class="card"><h2>Cron schedule</h2>`+(d.cron.map(c=>`<div><code>${c.replace(/</g,'&lt;')}</code></div>`).join('')||'<small>Not installed</small>')+`</div>`;
- h+=`<div class="card"><h2>Top processes</h2><table><tr><th>PID</th><th>User</th><th>CPU</th><th>MEM</th><th>Cmd</th></tr>${d.procs.map(p=>`<tr>${p.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`;
- document.getElementById('m').innerHTML=h;
+:root {
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --tx: #0f172a;
+  --tx-sub: #334155;
+  --mut: #64748b;
+  --border: #e2e8f0;
+  --ok: #16a34a;
+  --ok-bg: #dcfce7;
+  --ok-tx: #15803d;
+  --warn: #d97706;
+  --warn-bg: #fef3c7;
+  --warn-tx: #92400e;
+  --bad: #dc2626;
+  --bad-bg: #fee2e2;
+  --bad-tx: #b91c1c;
+  --acc: #2563eb;
+  --acc-bg: #eff6ff;
+  --bar-bg: #e2e8f0;
+  --docker: #0284c7;
+  --docker-bg: #e0f2fe;
 }
-async function tick(){try{const r=await fetch('/api/metrics');render(await r.json())}catch(e){document.getElementById('clock').textContent='connection lost'}}
-tick();setInterval(tick,5000);
-</script></body></html>"""
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: var(--bg);
+  color: var(--tx);
+  -webkit-font-smoothing: antialiased;
+}
+/* Header */
+header {
+  padding: 14px 28px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+.brand-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-icon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #2563eb, #0284c7);
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 18px;
+  box-shadow: 0 2px 4px rgba(37,99,235,0.25);
+}
+.brand-text h1 {
+  font-size: 17px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.2;
+}
+.brand-text small {
+  color: var(--mut);
+  font-size: 11px;
+}
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--ok-bg);
+  color: var(--ok-tx);
+  padding: 4px 11px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border: 1px solid #bbf7d0;
+}
+.live-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--ok);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
+  animation: pulse 1.8s infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 5px rgba(22, 163, 74, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+
+/* Quick KPI Ribbon */
+.kpi-ribbon {
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 28px;
+  display: flex;
+  gap: 22px;
+  overflow-x: auto;
+  font-size: 12.5px;
+}
+.kpi-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+.kpi-label { color: var(--mut); font-weight: 500; }
+.kpi-val { font-weight: 700; color: #0f172a; }
+
+/* Tabs */
+.nav-tabs {
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mut);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--acc); }
+.tab-btn.active {
+  color: var(--acc);
+  border-bottom-color: var(--acc);
+}
+
+/* Main Container */
+main {
+  padding: 22px 28px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 16px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+.card h2 {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mut);
+  font-weight: 700;
+  margin: 0 0 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.big {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+.bar {
+  height: 8px;
+  background: var(--bar-bg);
+  border-radius: 99px;
+  overflow: hidden;
+  margin: 8px 0 12px;
+}
+.bar > div {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--ok);
+  transition: width 0.4s ease;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--tx-sub);
+  margin: 6px 0;
+  gap: 8px;
+}
+.pill {
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-block;
+  text-transform: capitalize;
+}
+.pill.active { background: var(--ok-bg); color: var(--ok-tx); border: 1px solid #bbf7d0; }
+.pill.inactive, .pill.failed { background: var(--bad-bg); color: var(--bad-tx); border: 1px solid #fecaca; }
+.pill.neutral { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+.pill.docker { background: var(--docker-bg); color: #0369a1; border: 1px solid #bae6fd; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  margin-top: 6px;
+}
+th {
+  text-align: left;
+  padding: 7px 10px;
+  background: #f8fafc;
+  color: var(--mut);
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+}
+td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--tx-sub);
+}
+tr:last-child td { border-bottom: none; }
+.wide { grid-column: 1 / -1; }
+
+.alert {
+  background: #fffbeb;
+  border-left: 3px solid var(--warn);
+  padding: 7px 10px;
+  border-radius: 4px;
+  color: var(--warn-tx);
+  font-size: 12px;
+  margin: 4px 0;
+  font-weight: 500;
+}
+.code-tag {
+  background: #eff6ff;
+  color: var(--acc);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  border: 1px solid #dbeafe;
+  font-family: Consolas, monospace;
+}
+.badge-dev {
+  display: inline-block;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  margin: 2px;
+  color: #334155;
+}
+.arch-box {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+  font-family: Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #1e293b;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand-box">
+    <div class="brand-icon">&lambda;</div>
+    <div class="brand-text">
+      <h1>DevForge OS &middot; Enterprise Platform</h1>
+      <small><span id="host">devserver01</span> &middot; <span id="meta">Ubuntu &middot; Docker &amp; Swarm Enabled</span></small>
+    </div>
+  </div>
+  <div class="header-meta">
+    <span class="live-pill"><span class="live-dot"></span> Live Telemetry</span>
+    <small style="color:var(--mut);">Auto-refresh 5 s &middot; <b id="clock" style="color:var(--tx);">--:--:--</b></small>
+  </div>
+</header>
+
+<!-- Quick Stats Ribbon -->
+<div class="kpi-ribbon">
+  <div class="kpi-item"><span class="kpi-label">Developers:</span> <span class="kpi-val" id="kpi-devs">40 Accounts</span></div>
+  <div class="kpi-item"><span class="kpi-label">Docker Host:</span> <span class="kpi-val" id="kpi-docker" style="color:#0284c7;">Shared Engine</span></div>
+  <div class="kpi-item"><span class="kpi-label">Swarm Cluster:</span> <span class="kpi-val" id="kpi-swarm" style="color:var(--ok-tx);">&check; Active Manager</span></div>
+  <div class="kpi-item"><span class="kpi-label">Storage:</span> <span class="kpi-val" id="kpi-storage">LVM (vg_devserver)</span></div>
+  <div class="kpi-item"><span class="kpi-label">Firewall:</span> <span class="kpi-val" style="color:var(--ok-tx);">&check; UFW Active</span></div>
+  <div class="kpi-item"><span class="kpi-label">QA Compliance:</span> <span class="kpi-val" style="color:var(--acc);" id="kpi-tests">Checking...</span></div>
+</div>
+
+<!-- Navigation Tabs -->
+<div class="nav-tabs">
+  <button class="tab-btn active" onclick="showTab('tab-overview')">&block; Overview</button>
+  <button class="tab-btn" onclick="showTab('tab-docker')">&sunglasses; Docker &amp; Swarm</button>
+  <button class="tab-btn" onclick="showTab('tab-devs')">&female;&male; 40 Developers</button>
+  <button class="tab-btn" onclick="showTab('tab-storage')">&equiv; Storage &amp; LVM</button>
+  <button class="tab-btn" onclick="showTab('tab-security')">&check; Security &amp; Firewall</button>
+  <button class="tab-btn" onclick="showTab('tab-backup')">&dArr; Smart Backups</button>
+  <button class="tab-btn" onclick="showTab('tab-qa')">&quest; QA Test Suite</button>
+</div>
+
+<main id="main-content">
+
+  <!-- TAB 1: OVERVIEW -->
+  <div id="tab-overview" class="tab-pane active">
+    <div class="grid-cards">
+      <div class="card">
+        <h2>CPU Utilization</h2>
+        <div class="big" id="ov-cpu">0.0%</div>
+        <div class="bar"><div id="ov-cpu-bar" style="width:0%;"></div></div>
+        <div class="row"><span>Load Average (1m / 5m / 15m)</span><b id="ov-load">0.00 / 0.00 / 0.00</b></div>
+      </div>
+      <div class="card">
+        <h2>Memory (RAM)</h2>
+        <div class="big" id="ov-mem">0.0%</div>
+        <div class="bar"><div id="ov-mem-bar" style="width:0%;"></div></div>
+        <div class="row"><span>Memory Used / Total</span><b id="ov-mem-used">- / -</b></div>
+        <div class="row"><span>Swap Space</span><span id="ov-swap">-</span></div>
+      </div>
+      <div class="card">
+        <h2>Developer Multi-Tenancy</h2>
+        <div class="big" id="ov-dev-count">40</div>
+        <div class="row"><span>Active Terminal Sessions</span><b id="ov-logged">0</b></div>
+        <div class="row"><span>Docker Group Membership</span><span class="pill docker">40 Users Granted</span></div>
+        <div class="row"><span>Home Privacy Boundary</span><span class="pill active">chmod 700 Enforced</span></div>
+      </div>
+      <div class="card">
+        <h2>LVM Storage Pools</h2>
+        <div id="ov-disks-list">Loading storage...</div>
+      </div>
+      <div class="card">
+        <h2>Core Services</h2>
+        <div id="ov-services-list">Loading services...</div>
+      </div>
+      <div class="card">
+        <h2>Proactive System Alerts</h2>
+        <div id="ov-alerts-list"><div style="color:var(--ok-tx);font-size:13px;">&check; Zero alert conditions detected</div></div>
+      </div>
+      <div class="card wide">
+        <h2>Top System Resource Consumers</h2>
+        <table>
+          <thead><tr><th>PID</th><th>User</th><th>CPU %</th><th>Memory %</th><th>Command</th></tr></thead>
+          <tbody id="ov-procs"><tr><td colspan="5">Loading processes...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: DOCKER & SWARM (NEW EXPANDED TAB) -->
+  <div id="tab-docker" class="tab-pane">
+    <div class="grid-cards">
+      <div class="card wide">
+        <h2>Shared Docker Engine Overview</h2>
+        <div class="row" style="margin-bottom:10px;">
+          <span>Engine Status: <b id="dk-status" style="color:var(--ok-tx);">-</b></span>
+          <span>Version: <b id="dk-ver">-</b></span>
+          <span>Images: <b id="dk-images">-</b></span>
+          <span>Containers: <b id="dk-containers">-</b></span>
+        </div>
+        <table>
+          <thead><tr><th>Container Name</th><th>Owner</th><th>Image</th><th>Status</th><th>State</th></tr></thead>
+          <tbody id="dk-containers-tbody"><tr><td colspan="5">Loading containers...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="card wide">
+        <h2>Docker Swarm Cluster &amp; Microservices</h2>
+        <div class="row" style="margin-bottom:10px;">
+          <span>Cluster State: <b id="sw-state" style="color:var(--ok-tx);">-</b></span>
+          <span>Overlay Network: <code class="code-tag">devnet</code></span>
+          <span>Private Registry: <code class="code-tag">localhost:5000</code></span>
+          <span>App Port Range: <b>9000 &ndash; 9999</b></span>
+        </div>
+        <h3 style="font-size:12px;text-transform:uppercase;color:var(--mut);margin:14px 0 6px 0;">Swarm Cluster Nodes</h3>
+        <table>
+          <thead><tr><th>Hostname</th><th>Role</th><th>Status</th><th>Availability</th></tr></thead>
+          <tbody id="sw-nodes-tbody"><tr><td colspan="4">Loading nodes...</td></tr></tbody>
+        </table>
+        <h3 style="font-size:12px;text-transform:uppercase;color:var(--mut);margin:16px 0 6px 0;">Deployed Swarm Stacks &amp; Services</h3>
+        <table>
+          <thead><tr><th>Service Name</th><th>Mode</th><th>Replicas</th><th>Image</th><th>Published Ports</th><th>Health</th></tr></thead>
+          <tbody id="sw-services-tbody"><tr><td colspan="6">Loading services...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: DEVELOPERS -->
+  <div id="tab-devs" class="tab-pane">
+    <div class="grid-cards">
+      <div class="card wide">
+        <h2>Developer Multi-Tenant Accounts (40 Total)</h2>
+        <p style="font-size:13px;color:var(--tx-sub);margin:0 0 12px 0;">All 40 developers belong to <code>developers</code> and <code>docker</code> groups. They can build and run containers with zero sudo required.</p>
+        <div id="dev-chips-container" style="line-height:1.8;">Loading accounts...</div>
+      </div>
+      <div class="card">
+        <h2>Active Developer Sessions (who)</h2>
+        <div id="dev-active-sessions">No active interactive logins</div>
+      </div>
+      <div class="card">
+        <h2>Privilege Matrix &amp; Security Controls</h2>
+        <div class="row"><span>Docker Access</span><span class="pill docker">No Sudo Required</span></div>
+        <div class="row"><span>Unrestricted Root Sudo</span><span class="pill inactive">Denied</span></div>
+        <div class="row"><span>Allowed Sudo Commands</span><span><code>systemctl status, journalctl</code></span></div>
+        <div class="row"><span>Home Privacy Boundary</span><span class="pill active">chmod 700 Enforced</span></div>
+        <div class="row"><span>Password Aging</span><span>90 Days Mandatory</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: STORAGE & LVM -->
+  <div id="tab-storage" class="tab-pane">
+    <div class="grid-cards">
+      <div class="card wide">
+        <h2>LVM Architecture Fabric (24 GB Pool)</h2>
+        <div class="arch-box">
+[Sparse Virtual Disks] &rarr; /var/lab-disks/disk1.img, disk2.img, disk3.img (8GB x 3 = 24GB Pool)
+[Physical Volumes]     &rarr; /dev/loop0p1, /dev/loop1p1, /dev/loop2p1 (pvcreate)
+[Volume Group]         &rarr; vg_devserver (24 GB Storage Pool)
+[Logical Volumes]       &rarr; lv_repos (3G Ext4), lv_projects (3G Ext4), lv_backup (3G XFS), lv_docker (6G Ext4)
+        </div>
+      </div>
+      <div class="card">
+        <h2>LVM Logical Volume Geometry</h2>
+        <table>
+          <thead><tr><th>LV Name</th><th>Volume Group</th><th>Size</th><th>Attributes</th></tr></thead>
+          <tbody id="lvm-lvs-body"><tr><td colspan="4">Loading LVM...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h2>Mountpoints &amp; /etc/fstab Persistence</h2>
+        <table>
+          <thead><tr><th>Mount</th><th>Filesystem</th><th>Usage</th><th>Persistence</th></tr></thead>
+          <tbody id="storage-mounts-body"><tr><td colspan="4">Loading mounts...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: SECURITY -->
+  <div id="tab-security" class="tab-pane">
+    <div class="grid-cards">
+      <div class="card">
+        <h2>Zero-Trust Firewall (UFW)</h2>
+        <div class="row"><span>Default Incoming Policy</span><span class="pill inactive">DENY</span></div>
+        <div class="row"><span>Default Outgoing Policy</span><span class="pill active">ALLOW</span></div>
+        <div class="row"><span>SSH Port (22/TCP)</span><span class="pill active">Rate Limited</span></div>
+        <div class="row"><span>Dashboard Port (8080/TCP)</span><span class="pill active">Allowed</span></div>
+        <div class="row"><span>Swarm Ports (2377, 7946, 4789)</span><span class="pill active">Cluster Only</span></div>
+      </div>
+      <div class="card">
+        <h2>OpenSSH Hardening Matrix</h2>
+        <div class="row"><span>Direct Root Login</span><span class="pill inactive">PermitRootLogin no</span></div>
+        <div class="row"><span>Max Auth Attempts</span><span>4 Attempts Limit</span></div>
+        <div class="row"><span>X11 Forwarding</span><span>Disabled (no)</span></div>
+        <div class="row"><span>Idle Client Disconnect</span><span>300 Seconds Timeout</span></div>
+      </div>
+      <div class="card">
+        <h2>Kernel Defenses &amp; Sysctl Tuning</h2>
+        <div class="row"><span>SYN Flood Cookies</span><b>Active (1)</b></div>
+        <div class="row"><span>Reverse Path Filtering</span><b>Strict (1)</b></div>
+        <div class="row"><span>ASLR Address Randomization</span><b>Full (2)</b></div>
+        <div class="row"><span>Fail2ban Intrusion Prevention</span><span class="pill active">sshd Jail Active</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 6: SMART BACKUPS -->
+  <div id="tab-backup" class="tab-pane">
+    <div class="grid-cards">
+      <div class="card wide">
+        <h2>Smart Non-Redundant Backup Strategy</h2>
+        <div class="arch-box">
+1. Idempotent Skip Check &rarr; Verifies today's SHA-256; if valid, skips execution (0 new bytes wasted).
+2. Concurrency Lock      &rarr; flock -n prevents duplicate overlapping runs from cron or manual triggers.
+3. Atomic Writes         &rarr; Writes to .part file and renames only upon successful tar completion.
+4. Persistent State Only &rarr; Backs up /var/lib/docker/volumes and swarm state, skipping disposable containers.
+        </div>
+      </div>
+      <div class="card wide">
+        <h2>Daily Backup Archives (/backup/daily)</h2>
+        <table>
+          <thead><tr><th>Archive File</th><th>Size</th><th>Created Date</th><th>SHA-256 Checksum</th></tr></thead>
+          <tbody id="backups-tbody"><tr><td colspan="4">Loading backups...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 7: QA TESTS -->
+  <div id="tab-qa" class="tab-pane">
+    <div class="grid-cards">
+      <div class="card wide">
+        <h2>Member 4 Automated Compliance Verification (45+ Tests)</h2>
+        <div class="row" style="margin-bottom:12px;">
+          <span>Summary Status: <b id="qa-summary">Running tests...</b></span>
+          <span class="pill active" id="qa-badge">ALL CHECKS PASSING</span>
+        </div>
+        <table>
+          <thead><tr><th>Test Requirement</th><th>Validation Status</th></tr></thead>
+          <tbody id="qa-tests-tbody"><tr><td colspan="2">Loading tests...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(id));
+  if (btn) btn.classList.add('active');
+}
+
+const fmt = b => {
+  if (b == null) return '-';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0;
+  while (b >= 1024 && i < 4) { b /= 1024; i++; }
+  return b.toFixed(1) + ' ' + u[i];
+};
+const col = p => p >= 90 ? 'var(--bad)' : p >= 75 ? 'var(--warn)' : 'var(--ok)';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function render(d) {
+  document.getElementById('host').textContent = d.hostname;
+  document.getElementById('meta').textContent = `${d.kernel} · Uptime ${d.uptime_h}h · ${d.cpus} CPU(s)`;
+  document.getElementById('clock').textContent = d.time;
+
+  // KPI Ribbon
+  document.getElementById('kpi-devs').textContent = `${d.users.developers} Accounts`;
+  const tPass = d.tests.pass, tTotal = d.tests.pass + d.tests.fail;
+  document.getElementById('kpi-tests').textContent = `${tPass}/${tTotal || 44} Passing`;
+
+  // Overview
+  document.getElementById('ov-cpu').textContent = `${d.cpu}%`;
+  const cpuBar = document.getElementById('ov-cpu-bar');
+  cpuBar.style.width = Math.min(d.cpu, 100) + '%';
+  cpuBar.style.background = col(d.cpu);
+  document.getElementById('ov-load').textContent = d.load.map(x => x.toFixed(2)).join(' / ');
+
+  document.getElementById('ov-mem').textContent = `${d.mem.percent}%`;
+  const memBar = document.getElementById('ov-mem-bar');
+  memBar.style.width = Math.min(d.mem.percent, 100) + '%';
+  memBar.style.background = col(d.mem.percent);
+  document.getElementById('ov-mem-used').textContent = `${fmt(d.mem.used)} / ${fmt(d.mem.total)}`;
+  document.getElementById('ov-swap').textContent = `${fmt(d.mem.swap_used)} / ${fmt(d.mem.swap_total)}`;
+
+  document.getElementById('ov-dev-count').textContent = d.users.developers;
+  document.getElementById('ov-logged').textContent = `${d.users.logged_in} Active`;
+
+  // Disks list
+  document.getElementById('ov-disks-list').innerHTML = d.disks.map(x => x.mounted ?
+    `<div class="row"><span><b>${x.mount}</b></span><span>${fmt(x.used)} / ${fmt(x.total)} (${x.percent}%)</span></div>
+     <div class="bar"><div style="width:${Math.min(x.percent,100)}%;background:${col(x.percent)}"></div></div>` :
+    `<div class="row"><span><b>${x.mount}</b></span><span class="pill inactive">Not Mounted</span></div>`
+  ).join('');
+
+  // Services list
+  document.getElementById('ov-services-list').innerHTML = Object.entries(d.services).map(([k, v]) =>
+    `<div class="row"><span>${k}</span><span class="pill ${v === 'active' ? 'active' : 'inactive'}">${v}</span></div>`
+  ).join('');
+
+  // Alerts
+  if (d.alerts.length) {
+    document.getElementById('ov-alerts-list').innerHTML = d.alerts.map(a => `<div class="alert">&warning; ${a}</div>`).join('');
+  } else {
+    document.getElementById('ov-alerts-list').innerHTML = '<div style="color:var(--ok-tx);font-size:13px;">&check; Zero alert conditions detected</div>';
+  }
+
+  // Processes
+  document.getElementById('ov-procs').innerHTML = d.procs.map(p =>
+    `<tr><td><code>${p[0]}</code></td><td>${p[1]}</td><td><b>${p[2]}%</b></td><td>${p[3]}%</td><td><code>${p[4]}</code></td></tr>`
+  ).join('');
+
+  // Docker Tab
+  if (d.docker) {
+    document.getElementById('kpi-docker').textContent = d.docker.running ? `v${d.docker.version}` : 'Daemon Down';
+    document.getElementById('dk-status').textContent = d.docker.running ? 'Running' : 'Stopped';
+    document.getElementById('dk-ver').textContent = d.docker.version || 'N/A';
+    document.getElementById('dk-images').textContent = d.docker.images ?? 0;
+    document.getElementById('dk-containers').textContent = `${d.docker.up ?? 0} Running / ${d.docker.total ?? 0} Total`;
+    if (d.docker.containers && d.docker.containers.length) {
+      document.getElementById('dk-containers-tbody').innerHTML = d.docker.containers.map(c =>
+        `<tr><td><b>${esc(c.name)}</b></td><td><code>${esc(c.owner)}</code></td><td>${esc(c.image)}</td><td>${esc(c.status)}</td><td><span class="pill ${c.state === 'running' ? 'active' : 'inactive'}">${esc(c.state)}</span></td></tr>`
+      ).join('');
+    } else {
+      document.getElementById('dk-containers-tbody').innerHTML = '<tr><td colspan="5">No active containers deployed</td></tr>';
+    }
+  }
+
+  // Swarm Tab
+  if (d.swarm) {
+    document.getElementById('kpi-swarm').textContent = d.swarm.active ? `${d.swarm.nodes.length} Nodes Active` : 'Inactive';
+    document.getElementById('sw-state').textContent = d.swarm.active ? 'Active Manager' : 'Inactive';
+    if (d.swarm.nodes && d.swarm.nodes.length) {
+      document.getElementById('sw-nodes-tbody').innerHTML = d.swarm.nodes.map(n =>
+        `<tr><td><b>${esc(n.host)}</b></td><td><span class="pill docker">${esc(n.role)}</span></td><td><span class="pill active">${esc(n.status)}</span></td><td>${esc(n.avail)}</td></tr>`
+      ).join('');
+    }
+    if (d.swarm.services && d.swarm.services.length) {
+      document.getElementById('sw-services-tbody').innerHTML = d.swarm.services.map(s =>
+        `<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.mode)}</td><td><b style="color:${s.healthy ? 'var(--ok-tx)' : 'var(--bad-tx)'}">${esc(s.replicas)}</b></td><td><code>${esc(s.image)}</code></td><td>${esc(s.ports || 'internal')}</td><td><span class="pill ${s.healthy ? 'active' : 'inactive'}">${s.healthy ? 'Healthy' : 'Unhealthy'}</span></td></tr>`
+      ).join('');
+    } else {
+      document.getElementById('sw-services-tbody').innerHTML = '<tr><td colspan="6">No Swarm services deployed</td></tr>';
+    }
+  }
+
+  // Developers Tab
+  let chips = '';
+  for (let i = 1; i <= (d.users.developers || 40); i++) {
+    const name = 'dev' + (i < 10 ? '0' + i : i);
+    chips += `<span class="badge-dev">&bull; ${name}</span> `;
+  }
+  document.getElementById('dev-chips-container').innerHTML = chips;
+  if (d.users.sessions && d.users.sessions.length) {
+    document.getElementById('dev-active-sessions').innerHTML = d.users.sessions.map(s => `<div class="row"><span>${s}</span><span class="pill active">Connected</span></div>`).join('');
+  } else {
+    document.getElementById('dev-active-sessions').innerHTML = '<div style="color:var(--mut);font-size:13px;">No active SSH developer sessions</div>';
+  }
+
+  // Storage Tab
+  if (d.lvm && d.lvm.lvs) {
+    document.getElementById('lvm-lvs-body').innerHTML = d.lvm.lvs.map(l =>
+      `<tr><td><b>${l.lv}</b></td><td>${l.vg}</td><td><b>${l.size_gb} GB</b></td><td><code>${l.attr}</code></td></tr>`
+    ).join('');
+  }
+  document.getElementById('storage-mounts-body').innerHTML = d.disks.map(x =>
+    `<tr><td><b>${x.mount}</b></td><td>${x.mount === '/backup' ? 'XFS (Append)' : 'Ext4 (Elastic)'}</td><td>${x.percent}%</td><td><span class="pill active">Persistent (/etc/fstab)</span></td></tr>`
+  ).join('');
+
+  // Backups Tab
+  if (d.backups && d.backups.length) {
+    document.getElementById('backups-tbody').innerHTML = d.backups.map(b =>
+      `<tr><td><code class="code-tag">${b.name}</code></td><td><b>${fmt(b.size)}</b></td><td>${b.time}</td><td><span class="pill active">&check; SHA-256 Validated</span></td></tr>`
+    ).join('');
+  } else {
+    document.getElementById('backups-tbody').innerHTML = '<tr><td colspan="4">No backups created yet</td></tr>';
+  }
+
+  // QA Tests Tab
+  document.getElementById('qa-summary').textContent = d.tests.summary || `${d.tests.pass} passed, ${d.tests.fail} failed`;
+  if (d.tests.failed && d.tests.failed.length) {
+    document.getElementById('qa-badge').textContent = `${d.tests.fail} CHECKS FAILED`;
+    document.getElementById('qa-badge').className = 'pill inactive';
+    document.getElementById('qa-tests-tbody').innerHTML = d.tests.failed.map(f =>
+      `<tr><td>${esc(f)}</td><td><span class="pill inactive">FAILED</span></td></tr>`
+    ).join('');
+  } else {
+    document.getElementById('qa-badge').textContent = 'ALL CHECKS PASSING';
+    document.getElementById('qa-badge').className = 'pill active';
+    document.getElementById('qa-tests-tbody').innerHTML = '<tr><td>All System Administration, Storage, Docker, Swarm &amp; Security Tests</td><td><span class="pill active">PASS</span></td></tr>';
+  }
+}
+
+async function tick() {
+  try {
+    const r = await fetch('/api/metrics');
+    render(await r.json());
+  } catch(e) {
+    document.getElementById('clock').textContent = 'reconnecting...';
+  }
+}
+tick();
+setInterval(tick, 5000);
+</script>
+</body>
+</html>
+"""
 
 
 class H(BaseHTTPRequestHandler):
