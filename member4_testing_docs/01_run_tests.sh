@@ -68,7 +68,7 @@ t "Swarm node(s) all Ready"                              "! docker node ls --for
 t "Overlay network $SWARM_NET exists"                    "docker network ls --filter driver=overlay --format '{{.Name}}' | grep -qx $SWARM_NET"
 t "Stack folder exists with demo stack"                  "[ -f $STACKS_DIR/demo.yml ]"
 t "Demo stack: all replicas running (2/2)"               "docker service ls --filter name=demo_web --format '{{.Replicas}}' | grep -qx '2/2'"
-t "Demo service answers on port 9080 (swarm ingress)"    "curl -fsS --retry 3 --retry-delay 2 --retry-connrefused -o /dev/null --max-time 5 http://127.0.0.1:9080 || curl -fsS -o /dev/null --max-time 5 http://localhost:9080 || curl -fsS -o /dev/null --max-time 5 \"http://\$(hostname -I | awk '{print \$1}'):9080\""
+t "Demo service answers on port 9080 (swarm ingress)"    "curl -fsS --retry 4 --retry-delay 2 --retry-connrefused -o /dev/null --max-time 5 http://127.0.0.1:9080 || curl -fsS -o /dev/null --max-time 5 http://localhost:9080 || curl -fsS -o /dev/null --max-time 5 \"http://\$(hostname -I | awk '{print \$1}'):9080\" || wget -q -O /dev/null --timeout=5 http://127.0.0.1:9080 || wget -q -O /dev/null --timeout=5 http://localhost:9080"
 t "${DEV_PREFIX}01 can list swarm services (no sudo)"    "sudo -u ${DEV_PREFIX}01 docker service ls"
 [[ "$REGISTRY_ENABLE" == "yes" ]] && t "Private registry answers on localhost:5000"  "curl -fsS -o /dev/null --max-time 5 http://localhost:5000/v2/"
 fi
