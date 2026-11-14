@@ -69,10 +69,11 @@ services:
       - "9080:80"
     networks: [$SWARM_NET]
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/"]
-      interval: 15s
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 5s
       timeout: 3s
       retries: 3
+      start_period: 2s
     deploy:
       replicas: 2
       resources:
@@ -90,6 +91,9 @@ chown -R root:"$DEV_GROUP" "$STACKS_DIR"; chmod 2775 "$STACKS_DIR"; find "$STACK
 if docker stack deploy -c "$STACKS_DIR/demo.yml" demo >/dev/null 2>&1; then
   for _ in $(seq 1 30); do
     [[ "$(docker service ls --filter name=demo_web --format '{{.Replicas}}')" == "2/2" ]] && break; sleep 2
+  done
+  for _ in $(seq 1 15); do
+    curl -fsS -o /dev/null --max-time 2 http://127.0.0.1:9080 2>/dev/null && break || sleep 1
   done
   ok "demo stack deployed: $(docker service ls --filter name=demo_web --format '{{.Name}} {{.Replicas}}')  ->  http://$(hostname -I | awk '{print $1}'):9080"
 else

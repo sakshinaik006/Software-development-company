@@ -9,6 +9,7 @@ if command -v ufw >/dev/null 2>&1; then
   ufw default deny incoming; ufw default allow outgoing
   ufw limit "${SSH_PORT}/tcp" comment 'SSH (rate limited)'     # allow SSH FIRST to avoid lock-out
   ufw allow "${DASH_PORT}/tcp" comment 'Dashboard'
+  ufw allow 9080/tcp comment 'Swarm demo service'
   for p in $SWARM_PEERS; do   # swarm cluster traffic ONLY from listed peer nodes
     ufw allow from "$p" to any port 2377 proto tcp comment 'Swarm management'
     ufw allow from "$p" to any port 7946 comment 'Swarm node gossip'
@@ -16,6 +17,8 @@ if command -v ufw >/dev/null 2>&1; then
   done
   ufw --force enable
   ufw status verbose
+  # Restart docker so it reinstalls its iptables / Swarm forwarding chains after UFW reset
+  command -v docker >/dev/null 2>&1 && systemctl is-active --quiet docker && systemctl restart docker >/dev/null 2>&1 || true
 elif command -v firewall-cmd >/dev/null 2>&1; then
   systemctl enable --now firewalld
   firewall-cmd --permanent --add-service=ssh
